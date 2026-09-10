@@ -3,6 +3,10 @@ name = "trace-api"
 version = "0.1.0"
 description = "Automated penetration testing system for API-related CVEs using LLMs and AI agents"
 requires-python = ">=3.11"
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+]
 dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",

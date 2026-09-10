@@ -151,3 +151,8 @@ This work is under peer review. If you use TRACE-API, please cite:
   year   = {2026}
 }
 ```
+
+## License
+
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE)
+file for the full text.
