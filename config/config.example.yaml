@@ -1,0 +1,78 @@
+# Copy this file to config.yaml and fill in your values. This is the single source of truth for all configuration settings.
+
+llm:
+  # Model/provider used by all agents unless overridden per-agent below.
+  provider: openai
+  model: gpt-5
+  api_key: ""            # provider API key (required)
+  api_base: null         # override for local/proxy endpoints (Ollama, vLLM, ...)
+  context_window: 8192   # prompt + completion window; match your model
+
+  # Optional transport settings, inherited by every agent:
+  # extra_headers: {ngrok-skip-browser-warning: "true"}
+  # json_response_format: true   # false if the provider rejects JSON mode
+  # num_retries: 0               # retry transient 5xx / empty responses
+  # stream: true                 # false for flaky-streaming backends
+  # extra_body: {}               # merged into request body (e.g. OpenRouter routing)
+
+  # Per-agent overrides, only fields that differ from the top level.
+  planning:   {temperature: 0.3, max_tokens: 8192}
+  verifier:   {temperature: 0.1, max_tokens: 4096}
+  exploiting: {temperature: 0.2, max_tokens: 4096}
+  reporting:  {temperature: 0.4, max_tokens: 16384}
+
+execution:
+  mode: host                 # "host" runs tools directly; "docker" sandboxes them
+  timeout_seconds: 60
+  max_timeout_seconds: 300
+  max_output_bytes: 102400   # 100 KB
+  sandbox:                   # used only when mode = docker
+    image: trace-api-executor:latest
+    container_name: trace-api-sandbox
+    network_mode: host
+    extra_volumes: []
+    extra_env: {}
+
+session:
+  session_dir: sessions
+
+recon:
+  max_iterations: 10
+  max_commands_per_iteration: 3
+  dir_enum:                  # built-in directory brute-force (no gobuster needed)
+    enabled: true
+    # wordlist_path: null    # null → bundled common_paths.txt
+    concurrency: 20
+    timeout_seconds: 5
+    max_paths: 300
+    max_findings: 40
+
+orchestrator:
+  max_replans: 3             # planning-phase replans (verifier rejections)
+  max_exploit_replans: 2     # exploitation-phase replans (separate budget)
+  max_fallbacks_per_step: 3
+  plan_fallbacks_enabled: true
+
+logging:
+  level: INFO
+  json_output: false
+  llm_log_dir: sessions
+
+report:
+  output_dir: reports
+  include_raw_logs: true
+  include_remediation: true
+
+cve_lookup: 
+  # CVE enrichment via OpenCVE
+  # Two ways to use this feature:
+  #   1. Online query: keep base_url at app.opencve.io and set the token below.
+  #   2. Self-hosted database: run your own OpenCVE instance (follow the OpenCVE documentation), then point base_url at it. The token is your instance's.
+  enabled: true
+  base_url: https://app.opencve.io/api
+  token: ""
+  timeout_seconds: 15
+  max_cves_per_product: 5
+  fetch_detail_for_top_k: 3
+  use_llm_alt_names: true
+  max_alt_names: 5

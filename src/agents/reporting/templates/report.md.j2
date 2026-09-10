@@ -1,0 +1,291 @@
+# Penetration Test Report: {{ title }}
+
+---
+
+## 1. Executive Summary
+
+{{ executive_summary }}
+
+---
+
+## 2. Target Information
+
+| Field | Value |
+|-------|-------|
+| URL | `{{ target.url }}` |
+| CVE ID | {{ target.cve_id or "Not specified" }} |
+{% for key, value in target.metadata.items() %}
+| {{ key }} | {{ value }} |
+{% endfor %}
+
+---
+
+## 3. Session Metadata
+
+| Field | Value |
+|-------|-------|
+| Session ID | `{{ session_id }}` |
+| Final State | {{ fsm_state }} |
+| Created | {{ created_at }} |
+| Last Updated | {{ updated_at }} |
+| Plan Revisions | {{ plan_revision_count }} |
+| Steps flagged as evidence | {{ evidence_steps | length }} (see §9; success is assessed externally, not declared here) |
+
+---
+
+## 4. Reconnaissance Summary
+
+{% if recon_results %}
+**{{ recon_results | length }} finding(s) discovered during reconnaissance.**
+
+{% for finding in recon_results %}
+### Finding {{ loop.index }}: {{ finding.finding_type }}
+
+- **Source:** `{{ finding.source_command }}`
+- **ID:** {{ finding.finding_id }}
+{% if finding.data %}
+- **Details:**
+{% for key, value in finding.data.items() %}
+  - {{ key }}: {{ value }}
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+{% else %}
+No reconnaissance findings were recorded.
+{% endif %}
+
+---
+
+## 5. CVE Background
+
+{% if rag_context %}
+The following information was retrieved from the knowledge base:
+
+{% for ctx in rag_context %}
+### Source {{ loop.index }}{% if ctx.cve_id %} ({{ ctx.cve_id }}){% endif %}
+
+{% if ctx.title %}**{{ ctx.title }}**{% endif %}
+
+{% if ctx.description %}
+{{ ctx.description }}
+{% endif %}
+
+{% if ctx.exploit_method %}
+**Exploit Method:** {{ ctx.exploit_method }}
+{% endif %}
+
+{% if ctx.vulnerability_type %}
+**Type:** {{ ctx.vulnerability_type }}
+{% endif %}
+
+{# The retrieved RAGResult carries its advisory text in `content` (CVE id, title,
+   CWE and description already formatted). Render it whenever the structured
+   title/description fields above are absent, so the retrieved knowledge is not
+   silently dropped from the report. #}
+{% if ctx.content and not (ctx.title or ctx.description) %}
+{{ ctx.content }}
+{% endif %}
+
+{% endfor %}
+{% else %}
+No CVE background information was retrieved from the knowledge base.
+{% endif %}
+
+---
+
+## 6. API Asset Graph Summary
+
+{% if graph_summary %}
+```
+{{ graph_summary }}
+```
+{% else %}
+No API asset graph was constructed for this session.
+{% endif %}
+
+---
+
+## 7. Attack Plan
+
+{% if attack_plan %}
+**Plan ID:** `{{ attack_plan.plan_id }}`
+
+### Vulnerability Hypothesis
+
+| Field | Value |
+|-------|-------|
+| Type | {{ attack_plan.vulnerability_hypothesis.type }} |
+| Description | {{ attack_plan.vulnerability_hypothesis.description }} |
+| Confidence | {{ attack_plan.vulnerability_hypothesis.confidence }} |
+
+{% if attack_plan.preconditions %}
+### Preconditions
+
+{% for pre in attack_plan.preconditions %}
+- {{ pre }}
+{% endfor %}
+{% endif %}
+
+### Steps ({{ attack_plan.steps | length }})
+
+{% for step in attack_plan.steps %}
+{{ loop.index }}. **{{ step.description }}** (`{{ step.step_id }}`)
+   - Command: `{{ step.command }}`
+{% if step.expected_result %}
+   - Expected: {{ step.expected_result }}
+{% endif %}
+{% if step.success_criteria %}
+   - Success criteria: {{ step.success_criteria }}
+{% endif %}
+{% if step.fallbacks %}
+   - Fallbacks: {{ step.fallbacks | length }}
+{% endif %}
+
+{% endfor %}
+
+### Success Criteria
+
+{{ attack_plan.success_criteria or "Not specified" }}
+
+{% if attack_plan.evidence_requirements %}
+### Evidence Requirements
+
+{% for req in attack_plan.evidence_requirements %}
+- {{ req }}
+{% endfor %}
+{% endif %}
+{% else %}
+No attack plan was generated for this session.
+{% endif %}
+
+---
+
+## 8. Exploitation Trace
+
+{% if exploit_trace %}
+{% for step in exploit_trace %}
+### Step {{ loop.index }}: {{ step.step_description }} (`{{ step.step_id }}`)
+
+| Field | Value |
+|-------|-------|
+| Status | **{{ step.status }}** |
+| Duration | {{ step.duration_ms }}ms |
+| Is Evidence | {{ "Yes" if step.is_evidence else "No" }} |
+| Timestamp | {{ step.timestamp }} |
+
+**Command:**
+```
+{{ step.command }}
+```
+
+{% if step.stdout %}
+**Output:**
+```
+{{ step.stdout[:2000] }}{% if step.stdout | length > 2000 %}
+... (truncated, {{ step.stdout | length }} bytes total){% endif %}
+
+```
+{% endif %}
+
+{% if step.stderr %}
+**Errors:**
+```
+{{ step.stderr[:1000] }}{% if step.stderr | length > 1000 %}
+... (truncated){% endif %}
+
+```
+{% endif %}
+
+{% if step.http_response %}
+**HTTP Response:**
+
+| Field | Value |
+|-------|-------|
+| Status Code | {{ step.http_response.status_code }} |
+| Content-Type | {{ step.http_response.content_type or "N/A" }} |
+
+{% if step.http_response.body %}
+```
+{{ step.http_response.body[:2000] }}{% if step.http_response.body | length > 2000 %}
+... (truncated){% endif %}
+
+```
+{% endif %}
+{% endif %}
+
+{% if step.evidence_summary %}
+**LLM evidence note:** {{ step.evidence_summary }}
+{% endif %}
+
+---
+
+{% endfor %}
+{% else %}
+No exploitation steps were executed.
+{% endif %}
+
+## 9. Evidence and Findings
+
+{% if evidence_steps %}
+**{{ evidence_steps | length }} step(s) were flagged as potential evidence by the automated judge.**
+These are candidate findings for review — the report does not assert that they prove the vulnerability.
+
+{% for step in evidence_steps %}
+### Candidate Evidence {{ loop.index }}: {{ step.step_description }}
+
+- **Step ID:** {{ step.step_id }}
+- **Command:** `{{ step.command }}`
+- **LLM note:** {{ step.evidence_summary or "(no summary provided)" }}
+
+{% endfor %}
+{% else %}
+No steps were flagged as evidence during exploitation.
+{% endif %}
+
+---
+
+## 10. Conclusion
+
+{{ conclusion }}
+
+---
+
+{% if remediation %}
+## 11. Remediation Notes
+
+{{ remediation }}
+
+---
+
+{% endif %}
+{% if include_raw_logs and exploit_trace %}
+## Appendix: Raw Execution Logs
+
+{% for step in exploit_trace %}
+### {{ step.step_id }} ({{ step.status }})
+
+```
+Command: {{ step.command }}
+Exit Status: {{ step.status }}
+Duration: {{ step.duration_ms }}ms
+Timestamp: {{ step.timestamp }}
+
+--- stdout ---
+{{ step.stdout or "(empty)" }}
+
+--- stderr ---
+{{ step.stderr or "(empty)" }}
+```
+
+{% endfor %}
+{% endif %}
+{% if failure_history %}
+## Appendix: Failure History
+
+| State | Error | Recovery Action | Timestamp |
+|-------|-------|-----------------|-----------|
+{% for f in failure_history %}
+| {{ f.state }} | {{ f.error }} | {{ f.recovery_action or "N/A" }} | {{ f.timestamp }} |
+{% endfor %}
+{% endif %}
